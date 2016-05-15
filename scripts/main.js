@@ -23,6 +23,42 @@ $(document).ready(function(){
 });
 
 
+function evoluciona(){
+
+    poblacionInicial 	= $('#poblacion').val();
+    pc 					= $('#cruzamiento').val();
+    pm 					= $('#mutacion').val();
+    generaciones 		= $('#generaciones').val();
+    iniciaPoblacion();
+    evaluaPoblacion();
+    datosGeneraciones 	= [];
+    console.table(poblacionAlInicio);
+    graficaPastel('#genoma-inicio', poblacionAlInicio, 'Distribución al inicio');
+    imprimeTablaInicial();
+    for(var k=0;k<generaciones;k++){
+      evaluaPoblacion();
+
+      var padre = {};
+      padre.A = seleccionPadres();
+      padre.B = seleccionPadres();
+      console.log('Padres:');
+      console.log(padre);
+
+      var hijos = cruzamiento(padre);
+      var mutados = mutacion(hijos);
+      sustituyePoblacion(mutados);
+
+      evaluaPoblacion();
+      datosGeneraciones.push(obtieneDatosGeneracion());
+    }
+    console.table(poblacion);
+    imprimeTablaFinal();
+    graficaGenoma(datosGeneraciones);
+    graficaPastel('#genoma-final', poblacion, 'Distribución al final');
+
+
+}
+
 function iniciaPoblacion(){
   console.log('--- Poblacion Inicial ---');
   poblacion = [];
@@ -47,41 +83,96 @@ function evaluaPoblacion(){
   sumaTotal = 0;
   for(i=0;i<poblacion.length;i++){
     poblacion[i].cromosomaBin = poblacion[i].cromosomaArray.join('');
-    poblacion[i].cromosomaTotal = ((parseInt(poblacion[i].cromosomaBin, 2))/1073741824);
-    sumaTotal+=poblacion[i].cromosomaTotal;
+    poblacion[i].cromosomaTotal = ((parseInt(poblacion[i].cromosomaBin, 2))/2^30);
+    poblacion[i].fitness = fitness(poblacion[i].cromosomaBin);
+    sumaTotal+=poblacion[i].fitness;
   }
-  generaFitness();
+  generaProbSeleccion();
   console.log(poblacion);
 }
 
+// f(x)
+function fitness(valor){
+	// devuelve la cantidad de "1" que contiene el cromosoma
+    return (valor.split("1").length-1);
+}
+
+
 //Probabilidad de selección
-function generaFitness(){
-  console.log('--- Genera Fitness ---');
+function generaProbSeleccion(){
+  console.log('--- Genera Probabilidad de seleccion ---');
   $.each(poblacion,function(i,item){
-    var fitness = item.cromosomaTotal/sumaTotal;
-    poblacion[i].fitness = fitness;
+    var pselect = item.fitness/sumaTotal;
+    poblacion[i].probabilidad = pselect;
   });
 }
 
+/*
 function obtieneDatosGeneracion(){
   var menor=1,mayor= 0,totPromedio= 0,imayor= 0, imenor=0;
   for(i=0;i<poblacion.length;i++){
-    if(poblacion[i].cromosomaTotal<=menor){menor=poblacion[i].cromosomaTotal;imenor=poblacion[i].cromosomaindice;}
-    if(poblacion[i].cromosomaTotal>mayor){mayor=poblacion[i].cromosomaTotal;imayor=poblacion[i].cromosomaindice;}
+    if(poblacion[i].cromosomaTotal<=menor){
+    	menor=poblacion[i].cromosomaTotal;
+    	imenor=poblacion[i].cromosomaindice;
+    }
+    if(poblacion[i].cromosomaTotal>mayor){
+    	mayor=poblacion[i].cromosomaTotal;
+    	imayor=poblacion[i].cromosomaindice;
+    }
     totPromedio+=poblacion[i].cromosomaTotal;
   }
   return {menor:menor,mayor:mayor,promedio:(totPromedio/poblacion.length),imayor:imayor,imenor:imenor};
 }
+*/
+function obtieneDatosGeneracion(){
+  var menor=30,mayor= 0,totPromedio= 0,imayor= 0, imenor=0;
+  for(i=0;i<poblacion.length;i++){
+    if(poblacion[i].fitness<=menor){
+    	menor=poblacion[i].fitness;
+    	imenor=poblacion[i].cromosomaindice;
+    }
+    if(poblacion[i].fitness>mayor){
+    	mayor=poblacion[i].fitness;
+    	imayor=poblacion[i].cromosomaindice;
+    }
+    totPromedio+=poblacion[i].fitness;
+  }
+  return {menor:menor,mayor:mayor,promedio:(totPromedio/poblacion.length),imayor:imayor,imenor:imenor};
+}
 
-function imprimeTabla(){
+function imprimeTablaInicial(){
   $('#resultados tbody').html('');
     $('.results').html('');
+
+  var html = '<tr><td> </td><td>--------Tabla Inicial--------</td><td> </td><td> </td><td> </td></tr>';
+  $('#resultados tbody').append(html);
+  fitnessAcumulado = 0;
+  $.each(poblacionAlInicio,function(i,item){
+    fitnessAcumulado+=item.fitness;
+    var html = '<tr><td>'+i+'</td><td>'+item.cromosomaBin+'</td><td>'+item.fitness+'</td><td>'+item.probabilidad+'</td><td>'+fitnessAcumulado+'</td></tr>';
+    $('#resultados tbody').append(html);
+  });
+
+
+  var html = '<tr><td> </td><td> Suma </td><td>'+fitnessAcumulado+'</td><td> </td><td> </td></tr><tr><td></td><td></td><td></td><td></td><td></td></tr>';
+  $('#resultados tbody').append(html);
+}
+
+function imprimeTablaFinal(){
+//  $('#resultados tbody').html('');
+//    $('.results').html('');
+
+  var html = '<tr><td> </td><td>---------Tabla Final---------</td><td> </td><td> </td><td> </td></tr>';
+  $('#resultados tbody').append(html);
+
   fitnessAcumulado = 0;
   $.each(poblacion,function(i,item){
     fitnessAcumulado+=item.fitness;
-    var html = '<tr><td>'+i+'</td><td>'+item.cromosomaBin+'</td><td>'+item.cromosomaTotal+'</td><td>'+item.fitness+'</td><td>'+fitnessAcumulado+'</td></tr>';
+    var html = '<tr><td>'+i+'</td><td>'+item.cromosomaBin+'</td><td>'+item.fitness+'</td><td>'+item.probabilidad+'</td><td>'+fitnessAcumulado+'</td></tr>';
     $('#resultados tbody').append(html);
   });
+  var html = '<tr><td> </td><td> Suma </td><td>'+fitnessAcumulado+'</td><td> </td><td> </td></tr>';
+  $('#resultados tbody').append(html);
     /*
     console.log(datosGeneraciones[poblacionInicial-1]);
     console.log(poblacionInicial-1);
@@ -93,40 +184,6 @@ function imprimeTabla(){
 
 
 
-function evoluciona(){
-
-    poblacionInicial = $('#poblacion').val();
-    pc = $('#cruzamiento').val();
-    pm = $('#mutacion').val();
-    generaciones = $('#generaciones').val();
-    iniciaPoblacion();
-    evaluaPoblacion();
-    datosGeneraciones = [];
-    console.table(poblacionAlInicio);
-    graficaPastel('#genoma-inicio', poblacionAlInicio, 'Distribución al inicio');
-    for(var k=0;k<generaciones;k++){
-      evaluaPoblacion();
-
-      var padre = {};
-      padre.A = seleccionPadres();
-      padre.B = seleccionPadres();
-      console.log(padre);
-
-      var hijos = cruzamiento(padre);
-      var mutados = mutacion(hijos);
-      sustituyePoblacion(mutados);
-
-      evaluaPoblacion();
-      datosGeneraciones.push(obtieneDatosGeneracion());
-    }
-    console.table(poblacion);
-    imprimeTabla();
-    graficaGenoma(datosGeneraciones);
-    graficaPastel('#genoma-final', poblacion, 'Distribución al final');
-
-
-}
-
 function seleccionPadres(){
   var r = Math.random();
   var c = r*sumaTotal;
@@ -134,7 +191,7 @@ function seleccionPadres(){
   var statusRetorno = false;
   var seleccionado;
   $.each(poblacion,function(i,item){
-    Ca+=item.cromosomaTotal;
+    Ca+=item.fitness;
     if((Ca > c) && (statusRetorno == false)){
       seleccionado = item;
       statusRetorno = true;
@@ -160,8 +217,9 @@ function cruzamiento(padre){
     console.log('Van a cruzarse');
     var l = genes;
     var x = Math.round(Math.random()*(4-2)+parseInt(0));
+    console.log('Habrá cruze en: '+x);
     hijo.A = {cromosomaBin:padre.A.cromosomaBin.substring(0, x)+padre.B.cromosomaBin.substring(x,l), cromosomaindice:padre.A.cromosomaindice};
-    hijo.B = {cromosomaBin:padre.B.cromosomaBin.substring(0, x)+padre.A.cromosomaBin.substring(x,l),cromosomaindice:padre.B.cromosomaindice};
+    hijo.B = {cromosomaBin:padre.B.cromosomaBin.substring(0, x)+padre.A.cromosomaBin.substring(x,l), cromosomaindice:padre.B.cromosomaindice};
     hijo.A.cromosomaTotal = parseInt(hijo.A.cromosomaBin, 2);
     hijo.B.cromosomaTotal = parseInt(hijo.B.cromosomaBin, 2);
   }else{
